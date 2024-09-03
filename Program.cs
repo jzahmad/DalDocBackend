@@ -2,13 +2,14 @@ using DalDocBackend.Data;
 using DalDocBackend.Model;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.EntityFrameworkCore;
+using Amazon.S3;
+using Amazon.SimpleNotificationService;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 
 builder.Services.AddControllers();
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -30,6 +31,26 @@ builder.Services.AddIdentityCore<User>()
     .AddEntityFrameworkStores<AppDbContext>()
     .AddApiEndpoints();
 
+// aws configration
+builder.Services.AddDefaultAWSOptions(builder.Configuration.GetAWSOptions());
+builder.Services.AddAWSService<IAmazonS3>();
+builder.Services.AddAWSService<IAmazonSimpleNotificationService>();
+builder.Services.AddSingleton<S3Service>();
+
+builder.Services.AddCors(options =>
+{
+    options.AddPolicy("AllowSpecificOrigin",
+        policy =>
+        {
+            policy.WithOrigins("http://localhost:3000") // Allow requests from this origin
+                  .AllowAnyHeader()
+                  .AllowAnyMethod()
+                  .AllowCredentials(); // Allows sending credentials if needed
+        });
+});
+
+builder.Services.AddSignalR();
+
 var app = builder.Build();
 
 app.MapIdentityApi<User>();
@@ -45,7 +66,9 @@ app.UseHttpsRedirection();
 
 app.UseAuthentication(); // Ensure authentication middleware is added
 app.UseAuthorization();
+app.UseCors("AllowSpecificOrigin");
 
 app.MapControllers();
+app.MapHub<ChatHub>("/chat");
 
 app.Run();
